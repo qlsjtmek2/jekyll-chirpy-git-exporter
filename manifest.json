@@ -1,7 +1,7 @@
 {
 	"id": "jekyll-chirpy-git-exporter",
 	"name": "Jekyll Chirpy Git Exporter",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "0.15.0",
 	"description": "Export notes to Git blog of Jekyll Chirpy Template",
 	"author": "Shin Huigon",
