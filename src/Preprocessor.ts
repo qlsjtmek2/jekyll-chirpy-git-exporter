@@ -284,13 +284,11 @@ export class ChirpyPreprocessor implements Preprocessor {
                 }
             );
 
-            // 기존 수식 블록 처리
-            processedPost = processedPost.replace(/(^|\n)(>?\s*)\$\$(.*?)\$\$/gms, (match, newline, prefix, content) => {
+            // 수식 블록 앞뒤로 빈 줄 추가
+            processedPost = processedPost.replace(/(^|\n)((?:>\s*)*)\$\$(.*?)\$\$/gms, (match, newline, prefix, content) => {
                 const trimmed = content.trim();
-                const isQuoted = prefix.includes('>');
-                const quoteMark = isQuoted ? '> ' : '';
+                const quoteMark = prefix.trim() ? `${prefix.trim()} ` : '';
                 
-                // 수식 블록 앞뒤로 빈 줄 추가
                 return `${newline}${quoteMark}\n${quoteMark}$$\n${quoteMark}${trimmed}\n${quoteMark}$$\n${quoteMark}`;
             });
         }
@@ -306,6 +304,19 @@ export class ChirpyPreprocessor implements Preprocessor {
             processedPost = processedPost.replace(/\$\$(.*?)\$\$/gs, (match) => {
                 return match.replace(/\|/g, '\\mid');
             });
+        }
+
+        // 리스트 항목 뒤의 수식 이스케이프 처리
+        if (options.enableListMathEscape) {
+            processedPost = processedPost.replace(
+                /^(\s*(?:[-*]|\d+\.)\s+)(\$.*?\$)$/gm,
+                (match, list, math) => {
+                    if (math.startsWith('$')) {
+                        return `${list}\\${math}`;
+                    }
+                    return match;
+                }
+            );
         }
 
         // 수식 처리 부분에 추가

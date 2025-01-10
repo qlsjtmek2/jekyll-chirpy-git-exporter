@@ -26,6 +26,7 @@ export interface Settings {
 		enableMatrixLineBreak: boolean; // matrix 환경에서 줄바꿈(\\)을 \\\로 변환
 		enableCalloutAutoTitle: boolean;  // 콜아웃 빈 제목을 type으로 채우기
 		enableInlineToDisplay: boolean;  // 인라인 수식을 디스플레이 수식으로 변환
+		enableListMathEscape: boolean;  // 리스트 항목 뒤의 수식 이스케이프 처리
 	};
 	gitConfig: {
 		enabled: boolean;
@@ -65,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
 		enableMatrixLineBreak: true,
 		enableCalloutAutoTitle: true,
 		enableInlineToDisplay: false,
+		enableListMathEscape: true,
 	},
 	gitConfig: {
 		enabled: false,
@@ -337,6 +339,16 @@ export class SettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.preprocessingOptions.enableInlineToDisplay)
 				.onChange(async (value) => {
 					this.plugin.settings.preprocessingOptions.enableInlineToDisplay = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('리스트 수식 이스케이프')
+			.setDesc('리스트 항목(-나 *) 뒤의 수식 앞에 이스케이프(\\)를 추가합니다.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.preprocessingOptions.enableListMathEscape)
+				.onChange(async (value) => {
+					this.plugin.settings.preprocessingOptions.enableListMathEscape = value;
 					await this.plugin.saveSettings();
 				}));
 

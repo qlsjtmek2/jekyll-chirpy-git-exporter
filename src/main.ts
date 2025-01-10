@@ -98,6 +98,27 @@ export default class Main extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.reloadObjects();
+	}
+
+	private reloadObjects() {
+		this.postMetadataGenerator = new ChirpyPostMetadataGenerator(
+			this.settings.openAIKey, 
+			this.settings.preprocessingOptions.enableAutoTagging,
+			this.settings.blogPostPath
+		);
+		this.fileGetter = new ObsidianToExportFileGetter(
+			this.app, 
+			this.settings.exportPath, 
+			this.postRenamer
+		);
+		this.preprocessor = new ChirpyPreprocessor(this.imageCollector);
+
+		if (this.settings.gitConfig.enabled) {
+			this.gitUploader = new GitUploader(this.settings.gitConfig, this.app.vault);
+		} else {
+			this.gitUploader = null;
+		}
 	}
 
 	private registerCommands() {
