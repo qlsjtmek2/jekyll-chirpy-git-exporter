@@ -9,7 +9,6 @@ import { FileGetter, ObsidianToExportFileGetter, OldPathToExportFileGetter } fro
 import { Preprocessor, ChirpyPreprocessor } from './Preprocessor';
 import { GitUploader, GitConfig } from './GitUploader';
 import { ImagePathCollector } from './ImagePathCollector';
-import { CreatedDateModal } from './CreatedDateModal';
 
 export default class Main extends Plugin {
 	settings: Settings;
@@ -216,7 +215,7 @@ export default class Main extends Plugin {
 		for (const file of files) {
 			const exportFile = this.fileGetter.get(file);
 			if (exportFile instanceof TFile) {
-				await this.app.vault.delete(exportFile);
+				await this.app.fileManager.trashFile(exportFile);
 			}
 
 			const post = await this.postConvertor.convert(file);

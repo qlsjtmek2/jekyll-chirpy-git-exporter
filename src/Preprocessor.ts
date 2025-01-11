@@ -323,13 +323,14 @@ export class ChirpyPreprocessor implements Preprocessor {
         if (options.enableInlineToDisplay) {
             // $$ $$ 는 건드리지 않고 $ $ 만 변환
             processedPost = processedPost.replace(
-                /(?<!\$)\$(?!\$)([^$]*?[^$\n])(?<!\$)\$(?!\$)/g, 
-                (match, content) => {
+                /([^$]|^)\$([^$\n]+?[^$\n])\$([^$]|$)/g,
+                (match, before, content, after) => {
                     // $$ 다음에 숫자가 오는 패턴은 무시
                     if (content.match(/^\d+$/)) {
                         return match;
                     }
-                    return `$$${content}$$`;
+                    // 캡처된 앞뒤 문자를 유지하면서 $ -> $$ 변환
+                    return `${before}$$${content}$$${after}`;
                 }
             );
         }
