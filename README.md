@@ -65,6 +65,10 @@ Git 업로드 기능을 사용하기 위해서 Github 토큰을 발행해야 합
 
 플러그인 설정에서 설정된 "Blog Path" 경로 내의 모든 노트가 업로드됩니다.
 
+업로드한 Post를 삭제하고 싶은 경우, 해당 Post를 우클릭하고 "Delete Post"를 선택합니다.
+
+만약 Post를 한번에 삭제하고 싶은 경우, 해당 폴더를 우클릭하고 "Delete Post"를 선택합니다.
+
 
 # Obsidian Jekyll Chirpy Sync
 
@@ -138,3 +142,10 @@ Type and select All to search for related commands.
 
 Then choose Obsidian Jekyll Chirpy Sync: All Export in Blog Post Path.
 All notes in the folder specified by the Blog Path setting in the plugin will be uploaded.
+
+To delete a post:
+Right-click on a post and select Delete Post.
+
+To delete multiple posts at once:
+Right-click on a folder and select Delete Post.
+
