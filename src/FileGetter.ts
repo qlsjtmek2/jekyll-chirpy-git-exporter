@@ -1,7 +1,7 @@
 import { TFile, App } from "obsidian";
 import { PostRenamer } from "./PostRenamer";
 import { PostMetadata } from "./Post";
-import { unixToDate } from './Utils'
+import { unixToDateWithTime } from "./Utils";
 
 export interface FileGetter<T> {
     get(sourceFile: T): TFile | null;
@@ -21,7 +21,10 @@ export class ObsidianToExportFileGetter implements FileGetter<TFile> {
 
     get(sourceFile: TFile): TFile | null {
         const oldTitle = sourceFile.basename;
-        const metadata = { title: oldTitle, date: unixToDate(sourceFile.stat.ctime) };
+        const metadata = { 
+            title: oldTitle, 
+            date: unixToDateWithTime(sourceFile.stat.ctime)
+        };
         const expectedFileName = this.postRenamer.rename(oldTitle, metadata);
 
         // exportPath 내에서 해당 파일명을 가진 파일 찾기

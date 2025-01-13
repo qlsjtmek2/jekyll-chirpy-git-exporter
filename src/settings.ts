@@ -20,13 +20,17 @@ export interface Settings {
 		enableAutoTagging: boolean;  // 자동 태깅 활성화 여부
 		enableRawTag: boolean;        // 이중 중괄호 raw 태그 변환 활성화
 		enableMathNotation: boolean;  // 수식 표기법 전처리 활성화
-		enableMathEscape: boolean;    // 수식 내 밑줄 이스케이프 활성화
 		enableMathLineBreak: boolean;    // 수식 줄바꿈 활성화 여부
 		enableMathPipe: boolean;        // 수식 내 파이프(|)를 \mid로 변환
 		enableMatrixLineBreak: boolean; // matrix 환경에서 줄바꿈(\\)을 \\\로 변환
 		enableCalloutAutoTitle: boolean;  // 콜아웃 빈 제목을 type으로 채우기
 		enableInlineToDisplay: boolean;  // 인라인 수식을 디스플레이 수식으로 변환
 		enableListMathEscape: boolean;  // 리스트 항목 뒤의 수식 이스케이프 처리
+		enableLowercaseCodeLang: boolean;  // 코드 블록 언어 소문자 변환
+		enableCalloutCodeBlockEscape: boolean;  // 콜아웃 내 코드 블록 이스케이프 처리
+		enableTabToSpaces: boolean;     // 탭을 공백으로 변환
+		tabSize: number;                // 탭 크기 (공백 개수)
+		enableAutoHyperlink: boolean;  // URL 자동 하이퍼링크 변환
 	};
 	gitConfig: {
 		enabled: boolean;
@@ -35,9 +39,11 @@ export interface Settings {
 		branch: string;
 		token: string;
 		uploadPostPath: string;
-		uploadImagePath: string;
-		commitMessageTemplate: string;
-		imagePath: string; // 옵시디언 내의 이미지 경로
+			uploadImagePath: string;
+			commitMessageTemplate: string;
+			imagePath: string; // 옵시디언 내의 이미지 경로
+			deleteConfirmation: boolean; // 삭제 전 확인 여부
+			deleteCommitTemplate: string; // 삭제 시 커밋 메시지 템플릿
 	};
 }
 
@@ -60,13 +66,17 @@ export const DEFAULT_SETTINGS: Settings = {
 		imageShadow: false,
 		enableRawTag: true,
 		enableMathNotation: true,
-		enableMathEscape: true,
 		enableMathLineBreak: true,
 		enableMathPipe: true,
 		enableMatrixLineBreak: true,
 		enableCalloutAutoTitle: true,
 		enableInlineToDisplay: false,
 		enableListMathEscape: true,
+		enableLowercaseCodeLang: true,
+		enableCalloutCodeBlockEscape: true,
+		enableTabToSpaces: true,
+		tabSize: 4,
+		enableAutoHyperlink: true,
 	},
 	gitConfig: {
 		enabled: false,
@@ -77,7 +87,9 @@ export const DEFAULT_SETTINGS: Settings = {
 		uploadPostPath: '_posts',
 		uploadImagePath: 'assets/img/posts',
 		commitMessageTemplate: 'docs: add {count} posts',
-		imagePath: 'assets/img'
+		imagePath: 'assets/img',
+		deleteConfirmation: true,
+		deleteCommitTemplate: 'docs: delete post - {filename}'
 	}
 }
 
@@ -293,16 +305,6 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('수식 내 밑줄 이스케이프')
-			.setDesc('수식 내의 이스케이프되지 않은 밑줄(_)을 이스케이프(\_)합니다.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.preprocessingOptions.enableMathEscape)
-				.onChange(async (value) => {
-					this.plugin.settings.preprocessingOptions.enableMathEscape = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
 			.setName('수식 줄바꿈 처리')
 			.setDesc('디스플레이 수식($$...$$)의 앞뒤에 줄바꿈을 추가합니다.')
 			.addToggle(toggle => toggle
@@ -349,6 +351,62 @@ export class SettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.preprocessingOptions.enableListMathEscape)
 				.onChange(async (value) => {
 					this.plugin.settings.preprocessingOptions.enableListMathEscape = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('코드 블록 언어 소문자 변환')
+			.setDesc('코드 블록의 언어를 소문자로 변환합니다. 예: ```C# > ```c#')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.preprocessingOptions.enableLowercaseCodeLang)
+				.onChange(async (value) => {
+					this.plugin.settings.preprocessingOptions.enableLowercaseCodeLang = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('콜아웃 내 코드 블록 이스케이프 처리')
+			.setDesc('콜아웃 내 코드 블록의 이스케이프된 꺾쇠 괄호(\\<, \\>)를 일반 꺾쇠 괄호(<, >)로 변환합니다.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.preprocessingOptions.enableCalloutCodeBlockEscape)
+				.onChange(async (value) => {
+					this.plugin.settings.preprocessingOptions.enableCalloutCodeBlockEscape = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('코드블록 내 탭을 공백으로 변환')
+			.setDesc('코드블록 내의 탭 문자를 공백으로 변환합니다.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.preprocessingOptions.enableTabToSpaces)
+				.onChange(async (value) => {
+					this.plugin.settings.preprocessingOptions.enableTabToSpaces = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('탭 크기')
+			.setDesc('탭 문자를 몇 개의 공백으로 변환할지 설정합니다.')
+			.addText(text => text
+				.setPlaceholder('4')
+				.setValue(String(this.plugin.settings.preprocessingOptions.tabSize ?? 4))
+				.onChange(async (value) => {
+					const parsed = parseInt(value);
+					if (!isNaN(parsed) && parsed > 0) {
+						this.plugin.settings.preprocessingOptions.tabSize = parsed;
+						await this.plugin.saveSettings();
+					} else {
+						new Notice('유효한 숫자를 입력해주세요.');
+					}
+				}));
+
+		new Setting(containerEl)
+			.setName('URL 자동 하이퍼링크')
+			.setDesc('단독으로 있는 URL을 자동으로 하이퍼링크로 변환합니다. (예: https://... -> <https://...>)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.preprocessingOptions.enableAutoHyperlink)
+				.onChange(async (value) => {
+					this.plugin.settings.preprocessingOptions.enableAutoHyperlink = value;
 					await this.plugin.saveSettings();
 				}));
 
@@ -450,6 +508,27 @@ export class SettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.imagePath = value;
 						await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('삭제 확인')
+			.setDesc('게시물 삭제 전 확인 대화상자를 표시합니다.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.gitConfig.deleteConfirmation)
+				.onChange(async (value) => {
+					this.plugin.settings.gitConfig.deleteConfirmation = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('삭제 커밋 메시지')
+			.setDesc('게시물 삭제 시 사용할 커밋 메시지 템플릿. {filename}은 삭제된 파일명으로 대체됩니다.')
+			.addText(text => text
+				.setPlaceholder('docs: delete post - {filename}')
+				.setValue(this.plugin.settings.gitConfig.deleteCommitTemplate)
+				.onChange(async (value) => {
+					this.plugin.settings.gitConfig.deleteCommitTemplate = value;
+					await this.plugin.saveSettings();
 				}));
 	}
 }

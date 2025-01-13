@@ -1,6 +1,8 @@
 import { Octokit } from '@octokit/rest';
-import { Vault, TFile } from 'obsidian';
+import { Vault, TFile, Notice } from 'obsidian';
 import { ImagePathPair } from './ImagePathCollector';
+import { PostRenamer, ChirpyFilenameFormatter } from './PostRenamer';
+import { unixToDate } from './Utils';
 
 export interface GitConfig {
     enabled: boolean;
@@ -12,12 +14,15 @@ export interface GitConfig {
     uploadImagePath: string;
     commitMessageTemplate: string;
     imagePath: string;
+    deleteCommitTemplate: string;
+    deleteConfirmation: boolean;
 }
 
 export class GitUploader {
     private octokit: Octokit;
     private config: GitConfig;
     private vault: Vault;
+    private postRenamer: PostRenamer;
 
     constructor(config: GitConfig, vault: Vault) {
         this.config = config;
@@ -25,6 +30,7 @@ export class GitUploader {
         this.octokit = new Octokit({
             auth: config.token
         });
+        this.postRenamer = new ChirpyFilenameFormatter();
     }
 
     async uploadFile(path: string, content: string) {
@@ -260,5 +266,53 @@ export class GitUploader {
             console.error('Failed to upload post and images:', error);
             throw error;
         }
+    }
+
+    async deletePosts(paths: string[]) {
+        let deletedCount = 0;  // 삭제된 파일 수를 추적하기 위한 변수 추가
+        try {
+            for (const fileName of paths) {
+                const filePath = `${this.config.uploadPostPath}/${fileName}`;
+                
+                // 파일 존재 여부 확인
+                let fileToDelete;
+                try {
+                    const response = await this.octokit.rest.repos.getContent({
+                        owner: this.config.owner,
+                        repo: this.config.repo,
+                        path: filePath,
+                    });
+                    
+                    if (!Array.isArray(response.data)) {
+                        fileToDelete = response.data;
+                    }
+                } catch (error) {
+                    new Notice(`원격 저장소에 파일이 없습니다: ${filePath}`);
+                    continue;
+                }
+
+                if (fileToDelete) {
+                    await this.octokit.rest.repos.deleteFile({
+                        owner: this.config.owner,
+                        repo: this.config.repo,
+                        path: filePath,
+                        message: this.config.deleteCommitTemplate.replace('{filename}', fileName),
+                        sha: fileToDelete.sha,
+                        branch: this.config.branch
+                    });
+                    deletedCount++;  // 파일 삭제 성공시 카운트 증가
+                }
+            }
+        } catch (error) {
+            console.error('게시물 삭제 실패:', error);
+            throw error;
+        }
+
+        new Notice(`Git 저장소에서 ${deletedCount}개의 게시물이 삭제되었습니다.`);
+    }
+
+    // 기존 deletePost 메서드를 deletePosts를 사용하도록 수정
+    async deletePost(path: string) {
+        await this.deletePosts([path]);
     }
 }

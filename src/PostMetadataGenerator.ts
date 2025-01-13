@@ -1,6 +1,6 @@
 import { Post, PostMetadata } from "./Post";
 import OpenAI from "openai";
-import { unixToDate } from "./Utils";
+import { unixToDateWithTime } from "./Utils";
 
 /**
  * PostMetadataGenerator 인터페이스:
@@ -42,7 +42,7 @@ export class ChirpyPostMetadataGenerator implements PostMetadataGenerator {
   /**
    * generate(post: Post):
    * - title: post.getTitle()
-   * - date: post.getCreationDate() (YYYY-MM-DD 형식)
+   * - date: post.getCreationDate() (YYYY-MM-DD HH:MM:SS +/-TTTT 형식)
    * - categories: 경로에서 추출 (blogBasePath 제외)
    * - tags: OpenAI API로부터 생성 (옵션)
    * - math, toc, comments: true
@@ -50,8 +50,8 @@ export class ChirpyPostMetadataGenerator implements PostMetadataGenerator {
   public async generate(post: Post): Promise<PostMetadata> {
     const title = post.getTitle();
 
-    // date를 YYYY-MM-DD 형태로 변환
-    const dateString = unixToDate(post.getFile().stat.ctime);
+    // date를 YYYY-MM-DD HH.MM.SS +/-TTTT 형태로 변환
+    const dateString = unixToDateWithTime(post.getFile().stat.ctime);
 
     // 파일 경로에서 디렉터리만 추출하여 categories 생성
     // blogBasePath가 있다면, 해당 부분을 제외
