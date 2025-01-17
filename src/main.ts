@@ -354,7 +354,7 @@ export default class Main extends Plugin {
 
 			// 존재하는 export 파일들 삭제
 			for (const exportFile of exportFiles) {
-				await this.app.vault.delete(exportFile);
+				await this.app.fileManager.trashFile(exportFile);
 			}
 		} catch (error) {
 			new Notice('게시물 삭제 실패: ' + error.message);

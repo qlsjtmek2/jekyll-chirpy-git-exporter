@@ -3,6 +3,8 @@
 클릭 한번으로 Obsidian 내의 게시물을 Git 저장소로 업로드합니다.
 게시물은 자동으로 Jekyll Chirpy 테마 형식에 맞게 변환됩니다.
 
+- <https://qlsjtmek2.github.io/posts/Obsidian%EA%B3%BC-Git-Blog-%EC%97%B0%EB%8F%99%ED%95%98%EA%B8%B0/>
+
 ## Installation Guide
 
 1. Git 저장소를 클론합니다.

@@ -372,12 +372,12 @@ export class ChirpyPreprocessor implements Preprocessor {
         if (options.enableMathPipe) {
             // 디스플레이 수식 ($$...$$) 처리
             processedPost = processedPost.replace(/\$\$(.*?)\$\$/gs, (match, content) => {
-                return '$$' + content.replace(/(?<!\\)\|(?!\|)/g, '\\mid') + '$$';
+                return '$$' + content.replace(/([^\\])\|(?!\|)/g, '$1\\mid') + '$$';
             });
 
-            // 인라인 수식 ($...$) 처리 - 수정된 부분
+            // 인라인 수식 ($...$) 처리
             processedPost = processedPost.replace(/\$(.*?)\$/g, (match, content) => {
-                return '$' + content.replace(/(?<!\\)\|(?!\|)/g, '\\mid') + '$';
+                return '$' + content.replace(/([^\\])\|(?!\|)/g, '$1\\mid') + '$';
             });
         }
 
@@ -439,8 +439,14 @@ export class ChirpyPreprocessor implements Preprocessor {
         // URL 자동 하이퍼링크 변환
         if (options.enableAutoHyperlink) {
             processedPost = processedPost.replace(
-                /(?<![\[\(])https?:\/\/[^\s\]]+/g,
-                match => `<${match}>`
+                /(\[|\()?https?:\/\/[^\s\]]+/g,
+                (match, prefix) => {
+                    // 이미 [나 (로 시작하는 경우는 변환하지 않음
+                    if (prefix) {
+                        return match;
+                    }
+                    return `<${match}>`;
+                }
             );
         }
 
