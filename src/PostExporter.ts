@@ -1,6 +1,5 @@
 import { Post } from "./Post";
 import { normalizePath, TFile, Vault } from 'obsidian';
-import { join } from 'path';
 
 export interface PostExporter {
     export(post: Post, exportPath: string, exportFileName: string): Promise<void>;
@@ -26,7 +25,7 @@ export class ChirpyPostExporter implements PostExporter {
         try {
             // Vault 내의 전체 경로 생성
             const vaultPath = this.getVaultPath(exportPath);
-            const fullPath = join(vaultPath, exportFileName);
+            const fullPath = normalizePath(`${vaultPath}/${exportFileName}`);
 
             // 파일 존재 여부 확인
             let file: TFile;

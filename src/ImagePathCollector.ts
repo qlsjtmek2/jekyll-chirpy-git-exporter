@@ -16,10 +16,10 @@ export class ImagePathCollector {
 
     getImages(): ImagePathPair[] {
         const images = Array.from(this.imagePaths);
-        console.log(`Getting ${images.length} collected images`);
-        images.forEach(img => {
-            // console.log(`- Local: ${img.localPath}, Upload: ${img.uploadPath}`);
-        });
+        // console.log(`Getting ${images.length} collected images`);
+        // images.forEach(img => {
+        //     console.log(`- Local: ${img.localPath}, Upload: ${img.uploadPath}`);
+        // });
         return images;
     }
 

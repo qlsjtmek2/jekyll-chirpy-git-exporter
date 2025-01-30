@@ -1,6 +1,5 @@
-import { TFile, App } from 'obsidian';
+import { TFile, App, parseYaml } from 'obsidian';
 import { Post, PostMetadata } from './Post';
-import * as yaml from 'yaml';
 
 export class PostConvertor {
     private app: App;
@@ -41,7 +40,7 @@ export class PostConvertor {
         }
 
         const [_, yamlContent, bodyContent] = matches;
-        const metadata = yaml.parse(yamlContent) as PostMetadata;
+        const metadata = parseYaml(yamlContent) as PostMetadata;
 
         if (!metadata.title) {
             metadata.title = this.generateDefaultTitle(bodyContent);

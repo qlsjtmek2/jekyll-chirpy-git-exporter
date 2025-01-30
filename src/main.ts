@@ -1,16 +1,16 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, TFile } from 'obsidian';
+import { Notice, Plugin, TFile } from 'obsidian';
 import { Settings, DEFAULT_SETTINGS, SettingTab } from './settings';
-import { UniqueQueue } from './UniqueQueue';
 import { PostConvertor } from './PostConvertor';
 import { PostMetadataGenerator, ChirpyPostMetadataGenerator } from './PostMetadataGenerator';
 import { PostRenamer, ChirpyFilenameFormatter } from './PostRenamer';
 import { PostExporter, ChirpyPostExporter } from './PostExporter';
 import { FileGetter, ObsidianToExportFileGetter, OldPathToExportFileGetter } from './FileGetter';
 import { Preprocessor, ChirpyPreprocessor } from './Preprocessor';
-import { GitUploader, GitConfig } from './GitUploader';
+import { GitUploader } from './GitUploader';
 import { ImagePathCollector } from './ImagePathCollector';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { unixToDate } from './Utils';
+import { getText } from './ReferenceText';
 
 export default class Main extends Plugin {
 	settings: Settings;
@@ -26,12 +26,19 @@ export default class Main extends Plugin {
 	private gitUploader: GitUploader | null = null;
 	private imageCollector: ImagePathCollector;
 	
+	private getText() {
+		return getText(this.settings.language);
+	}
+
 	async onload() {
 		await this.loadSettings();
 
 		// this.eventQueue = new UniqueQueue<FileEvent>(isFileEventEqual);
 		this.postConvertor = new PostConvertor(this.app);
-		this.postMetadataGenerator = new ChirpyPostMetadataGenerator(this.settings.openAIKey, this.settings.preprocessingOptions.enableAutoTagging, this.settings.blogPostPath);
+		this.postMetadataGenerator = new ChirpyPostMetadataGenerator(this.settings.openAIKey, 
+			this.settings.preprocessingOptions.enableAutoTagging, 
+			this.settings.blogPostPath,
+			this);
 		this.postRenamer = new ChirpyFilenameFormatter();
 		this.fileGetter = new ObsidianToExportFileGetter(this.app, this.settings.exportPath, this.postRenamer);
 		this.oldPathFileGetter = new OldPathToExportFileGetter(this.app);
@@ -39,14 +46,18 @@ export default class Main extends Plugin {
 		this.imageCollector = new ImagePathCollector();
 		this.preprocessor = new ChirpyPreprocessor(this.imageCollector);
 
-		const updateBlogPostIconEl = this.addRibbonIcon('book-up-2', 'Export Blog Post', (evt: MouseEvent) => {
-			const file = this.app.workspace.getActiveFile();
-			if (file instanceof TFile) {
-				this.requestExportPost([file]);
-			} else {
-				new Notice('활성화된 파일이 없습니다.');
+		const updateBlogPostIconEl = this.addRibbonIcon(
+			this.getText().ribbon.exportPost.icon,
+			this.getText().ribbon.exportPost.tooltip,
+			(evt: MouseEvent) => {
+				const file = this.app.workspace.getActiveFile();
+				if (file instanceof TFile) {
+					this.requestExportPost([file]);
+				} else {
+					new Notice(this.getText().notice.noActiveFile);
+				}
 			}
-		});
+		);
 		updateBlogPostIconEl.addClass('blog-sync-ribbon-icon');
 
 		this.addSettingTab(new SettingTab(this.app, this));
@@ -60,32 +71,31 @@ export default class Main extends Plugin {
         // this.registerInterval(window.setInterval(() => this.requestEventProcessing(false), this.settings.workInterval));
 
 		if (this.settings.gitConfig.enabled) {
-			this.gitUploader = new GitUploader(this.settings.gitConfig, this.app.vault);
+			this.gitUploader = new GitUploader(this.settings.gitConfig, this.app.vault, this);
 		}
 
-		// 컨텍스트 메뉴 추가
+		// 컨텍스트 메뉴 수정
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {
 				menu.addItem((item) => {
 					if (file instanceof TFile) {
 						item
-							.setTitle('Export Post')
-							.setIcon('book-up-2')
+							.setTitle(this.getText().menu.exportPost.singleFile)
+							.setIcon(this.getText().menu.exportPost.icon)
 							.onClick(async () => {
 								await this.requestExportPost([file]);
 							});
 					} else {
-						// 폴더인 경우
 						const files = this.app.vault.getFiles()
 							.filter(f => f.path.startsWith(file.path + '/') && this.isInBlogPostPath(f.path));
 						item
-							.setTitle(`Export Posts (${files.length})`)
-							.setIcon('book-up-2')
+							.setTitle(this.getText().menu.exportPost.multipleFiles(files.length))
+							.setIcon(this.getText().menu.exportPost.icon)
 							.onClick(async () => {
 								if (files.length > 0) {
 									await this.requestExportPost(files);
 								} else {
-									new Notice('블로그 포스트 경로에 파일이 없습니다.');
+									new Notice(this.getText().notice.noFilesInBlogPath);
 								}
 							});
 					}
@@ -93,23 +103,21 @@ export default class Main extends Plugin {
 			})
 		);
 
-		// 파일 컨텍스트 메뉴에 삭제 명령 추가
+		// 삭제 메뉴 수정
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {
 				if (file instanceof TFile) {
-					// 파일인 경우
 					if (file.path.startsWith(this.settings.blogPostPath)) {
 						menu.addItem((item) => {
 							item
-								.setTitle('Delete Post')
-								.setIcon('trash')
+								.setTitle(this.getText().menu.deletePost.singleFile)
+								.setIcon(this.getText().menu.deletePost.icon)
 								.onClick(async () => {
 									await this.requestDeletePost([file]);
 								});
 						});
 					}
 				} else {
-					// 폴더인 경우
 					const files = this.app.vault.getFiles()
 						.filter(f => f.path.startsWith(file.path + '/') && 
 							f.path.startsWith(this.settings.blogPostPath));
@@ -117,8 +125,8 @@ export default class Main extends Plugin {
 					if (files.length > 0) {
 						menu.addItem((item) => {
 							item
-								.setTitle(`Delete Posts (${files.length})`)
-								.setIcon('trash')
+								.setTitle(this.getText().menu.deletePost.multipleFiles(files.length))
+								.setIcon(this.getText().menu.deletePost.icon)
 								.onClick(async () => {
 									await this.requestDeletePost(files);
 								});
@@ -127,6 +135,20 @@ export default class Main extends Plugin {
 				}
 			})
 		);
+
+		// 커맨드 등록 수정
+		this.addCommand({
+			id: this.getText().commands.exportPost.id,
+			name: this.getText().commands.exportPost.name,
+			callback: () => {
+				const file = this.app.workspace.getActiveFile();
+				if (file instanceof TFile) {
+					this.requestExportPost([file]);
+				} else {
+					new Notice(this.getText().notice.noActiveFile);
+				}
+			}
+		});
 	}
 
 	onunload() {
@@ -146,7 +168,8 @@ export default class Main extends Plugin {
 		this.postMetadataGenerator = new ChirpyPostMetadataGenerator(
 			this.settings.openAIKey, 
 			this.settings.preprocessingOptions.enableAutoTagging,
-			this.settings.blogPostPath
+			this.settings.blogPostPath,
+			this
 		);
 		this.fileGetter = new ObsidianToExportFileGetter(
 			this.app, 
@@ -156,7 +179,7 @@ export default class Main extends Plugin {
 		this.preprocessor = new ChirpyPreprocessor(this.imageCollector);
 
 		if (this.settings.gitConfig.enabled) {
-			this.gitUploader = new GitUploader(this.settings.gitConfig, this.app.vault);
+			this.gitUploader = new GitUploader(this.settings.gitConfig, this.app.vault, this);
 		} else {
 			this.gitUploader = null;
 		}
@@ -165,20 +188,20 @@ export default class Main extends Plugin {
 	private registerCommands() {
 		this.addCommand({
 			id: 'process-event-queue',
-			name: 'Export Blog Post',
+			name: 'Export blog post',
 			callback: () => {
 				const file = this.app.workspace.getActiveFile();
 				if (file instanceof TFile) {
 					this.requestExportPost([file]);
 				} else {
-					new Notice('활성화된 파일이 없습니다.');
+					new Notice('No active file.');
 				}
 			}
 		});
 
 		this.addCommand({
 			id: 'export-all-posts',
-			name: 'All Export in Blog Post Path',
+			name: 'Export all blog post files',
 			callback: () => {
 				this.exportAllPosts();
 			}
@@ -186,7 +209,7 @@ export default class Main extends Plugin {
 
 		this.addCommand({
 			id: 'delete-blog-post',
-			name: 'Delete Blog Post',
+			name: 'Delete blog post',
 			checkCallback: (checking: boolean): boolean => {
 				const activeFile = this.app.workspace.getActiveFile();
 				
@@ -195,7 +218,7 @@ export default class Main extends Plugin {
 					activeFile.path.startsWith(this.settings.blogPostPath);
 
 				if (isValidFile == null) {
-					new Notice('현재 파일은 블로그 포스트가 아닙니다.');
+					new Notice('Current file is not a blog post.');
 					return false;
 				}
 
@@ -219,17 +242,16 @@ export default class Main extends Plugin {
 	
 	private async requestExportPost(files: TFile[]) {
 		if (!files.length) {
-			new Notice('유효하지 않은 파일입니다.');
+			new Notice(this.getText().notice.invalidFile);
 			return;
 		}
 
-		// 모든 파일이 블로그 포스트 경로에 있는지 확인
 		if (!files.every(file => this.isInBlogPostPath(file.path))) {
-			new Notice('선택된 파일 중 블로그 포스트 경로에 속하지 않는 파일이 있습니다.');
+			new Notice(this.getText().notice.notInBlogPath);
 			return;
 		}
 
-		new Notice(`${files.length}개의 파일 내보내기를 시작합니다...`);
+		new Notice(this.getText().notice.startExport(files.length));
 
 		const processedFiles: { path: string; content: string }[] = [];
 		this.imageCollector.clear();
@@ -298,33 +320,33 @@ export default class Main extends Plugin {
 				// 포스트와 이미지를 함께 업로드
 				await this.gitUploader.uploadFiles(allFiles, commitMessage);
 
-				new Notice('블로그 포스트와 이미지 Git 업로드 완료');
+				new Notice(this.getText().notice.gitUploadSuccess);
 				this.imageCollector.clear();
 			} catch (error) {
-				console.error('Git 업로드 실패:', error);
-				new Notice('Git 업로드 실패');
+				console.error('Git upload failed:', error);
+				new Notice(this.getText().notice.gitUploadFailed);
 				throw error;
 			}
 		}
 
-		new Notice(`${files.length}개의 블로그 포스트 내보내기 완료`);
+		new Notice(this.getText().notice.exportSuccess(files.length));
 	}
 
 	private async requestDeletePost(files: TFile[]) {
 		if (!files.length) {
-			new Notice('유효하지 않은 파일입니다.');
+			new Notice(this.getText().notice.invalidFile);
 			return;
 		}
 
-		// 모든 파일이 블로그 포스트 경로에 있는지 확인
 		if (!files.every(file => this.isInBlogPostPath(file.path))) {
-			new Notice('선택된 파일 중 블로그 포스트 경로에 속하지 않는 파일이 있습니다.');
+			new Notice(this.getText().notice.notInBlogPath);
 			return;
 		}
 
 		if (this.settings.gitConfig.deleteConfirmation) {
 			const modal = new DeleteConfirmModal(this.app, 
-				files.length === 1 ? files[0].name : `${files.length}개의 파일`);
+				files.length === 1 ? files[0].name : `${files.length}개의 파일`, 
+				this);
 			modal.open();
 			const confirmed = await modal.waitForResult();
 			if (!confirmed) return;
@@ -357,7 +379,7 @@ export default class Main extends Plugin {
 				await this.app.fileManager.trashFile(exportFile);
 			}
 		} catch (error) {
-			new Notice('게시물 삭제 실패: ' + error.message);
+			new Notice(this.getText().notice.deletePostFailed(error.message));
 		}
 	}
 
@@ -366,7 +388,7 @@ export default class Main extends Plugin {
 			.filter(file => this.isInBlogPostPath(file.path));
 		
 		if (files.length === 0) {
-			new Notice('블로그 포스트 경로에 파일이 없습니다.');
+			new Notice(this.getText().notice.noFilesInBlogPath);
 			return;
 		}
 

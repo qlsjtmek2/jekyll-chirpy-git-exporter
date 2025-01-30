@@ -1,6 +1,8 @@
 import { Post, PostMetadata } from "./Post";
 import OpenAI from "openai";
 import { unixToDateWithTime } from "./Utils";
+import { getText, TextType } from "./ReferenceText";
+import MyPlugin from "./main";
 
 /**
  * PostMetadataGenerator 인터페이스:
@@ -18,18 +20,19 @@ export interface PostMetadataGenerator {
 export class ChirpyPostMetadataGenerator implements PostMetadataGenerator {
   private openai: OpenAI;
   private isTagging: boolean;
+  private blogBasePath: string;
+  private text: TextType;  // 또는 plugin.settings.language 사용
 
   /**
    * blogBasePath(예: "blog/posts"):
    * - 카테고리 추출 시 이 경로를 제외하고 가져옴.
    * - 사용 예: "blog/posts/IT/알고리즘/myfile.md" -> ["IT", "알고리즘"]
    */
-  private blogBasePath: string;
-
   constructor(
     openAiApiKey: string,
     isTagging: boolean = true,
-    blogBasePath: string = "blog/posts"
+    blogBasePath: string = "blog/posts",
+    plugin: MyPlugin
   ) {
     this.openai = new OpenAI({
       apiKey: openAiApiKey,
@@ -37,6 +40,7 @@ export class ChirpyPostMetadataGenerator implements PostMetadataGenerator {
     });
     this.isTagging = isTagging;
     this.blogBasePath = blogBasePath;
+    this.text = getText(plugin.settings.language);
   }
 
   /**
@@ -116,12 +120,12 @@ export class ChirpyPostMetadataGenerator implements PostMetadataGenerator {
   private async generateTagsFromContent(content: string): Promise<string[]> {
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4-mini",
         messages: [
           {
             role: "user",
-            content: `다음 글을 분석하여 핵심 키워드(태그) 5 ~ 8개를 추출해 주세요.\n\n글:\n${content}\n\n출력 형식: 키워드만 콤마로 구분, 불필요한 말 없이.`,
-          },
+            content: this.text.metadata.prompts.generateTags(content)
+          }
         ],
         max_tokens: 100,
         temperature: 0.7,
@@ -133,10 +137,9 @@ export class ChirpyPostMetadataGenerator implements PostMetadataGenerator {
         .map((tag) => tag.trim())
         .filter((tag) => tag.length > 0);
 
-      // console.log("생성된 태그:", tags);
       return tags;
     } catch (error) {
-      console.error("OpenAI API 호출 중 오류 발생:", error);
+      console.error(this.text.metadata.errors.openAIError(error.message));
       return [];
     }
   }

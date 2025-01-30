@@ -2,7 +2,8 @@ import { Octokit } from '@octokit/rest';
 import { Vault, TFile, Notice } from 'obsidian';
 import { ImagePathPair } from './ImagePathCollector';
 import { PostRenamer, ChirpyFilenameFormatter } from './PostRenamer';
-import { unixToDate } from './Utils';
+import { TextType, getText } from './ReferenceText';
+import MyPlugin from './main';
 
 export interface GitConfig {
     enabled: boolean;
@@ -23,19 +24,20 @@ export class GitUploader {
     private config: GitConfig;
     private vault: Vault;
     private postRenamer: PostRenamer;
+    private text: TextType;
 
-    constructor(config: GitConfig, vault: Vault) {
+    constructor(config: GitConfig, vault: Vault, plugin: MyPlugin) {
         this.config = config;
         this.vault = vault;
         this.octokit = new Octokit({
             auth: config.token
         });
         this.postRenamer = new ChirpyFilenameFormatter();
+        this.text = getText(plugin.settings.language);
     }
 
     async uploadFile(path: string, content: string) {
         try {
-            // 기존 파일 정보 먼저 확인
             let existingFile;
             try {
                 const response = await this.octokit.rest.repos.getContent({
@@ -48,8 +50,7 @@ export class GitUploader {
                     existingFile = response.data;
                 }
             } catch (error) {
-                // 파일이 없는 경우 무시
-                console.error(`File does not exist yet: _posts/${path}`);
+                console.error(this.text.git.errors.fileNotExistYet(`_posts/${path}`));
             }
 
             // 파일 업로드
@@ -64,7 +65,7 @@ export class GitUploader {
 
             // console.log(`Successfully uploaded file: _posts/${path}`);
         } catch (error) {
-            console.error(`Failed to upload file ${path}:`, error);
+            console.error(this.text.git.errors.uploadFailed(path), error);
             throw error;
         }
     }
@@ -89,7 +90,7 @@ export class GitUploader {
             const blobs = await Promise.all(
                 images.map(async image => {
                     if (!image.path) {
-                        console.error('Image path is undefined');
+                        console.error(this.text.git.errors.imagePathUndefined);
                         return null;
                     }
                     return this.octokit.rest.git.createBlob({
@@ -135,9 +136,9 @@ export class GitUploader {
                 force: true
             });
 
-            // console.log(`Successfully uploaded ${images.length} images in a single commit`);
+            console.log(this.text.git.uploadImageSuccess(images.length));
         } catch (error) {
-            console.error('Failed to upload images:', error);
+            console.error(this.text.git.errors.uploadImagesFailed, error);
             throw error;
         }
     }
@@ -207,13 +208,13 @@ export class GitUploader {
                     force: true // force 옵션 추가
                 });
             } catch (updateError) {
-                console.error('Failed to update ref:', updateError);
+                console.error(this.text.git.errors.updateRefFailed, updateError);
                 throw updateError;
             }
 
             // console.log(`Successfully uploaded ${files.length} files in a single commit`);
         } catch (error) {
-            console.error('Failed to upload files:', error);
+            console.error(this.text.git.errors.uploadFilesFailed, error);
             throw error;
         }
     }
@@ -236,13 +237,13 @@ export class GitUploader {
                     const imageFile = this.vault.getAbstractFileByPath(image.localPath);
                     
                     if (!(imageFile instanceof TFile)) {
-                        console.error(`Image file not found: ${image.localPath}`);
+                        console.error(this.text.git.errors.fileNotFound(image.localPath));
                         continue;
                     }
 
                     const imageData = await this.vault.readBinary(imageFile);
                     if (!imageData) {
-                        console.error(`Failed to read image: ${image.localPath}`);
+                        console.error(this.text.git.errors.readImageFailed(image.localPath));
                         continue;
                     }
 
@@ -252,7 +253,7 @@ export class GitUploader {
                         encoding: 'base64'
                     });
                 } catch (imageError) {
-                    console.error(`Error processing image ${image.localPath}:`, imageError);
+                    console.error(this.text.git.errors.processImageFailed(image.localPath), imageError);
                     continue;
                 }
             }
@@ -263,7 +264,7 @@ export class GitUploader {
             }
 
         } catch (error) {
-            console.error('Failed to upload post and images:', error);
+            console.error(this.text.git.errors.uploadPostAndImagesFailed, error);
             throw error;
         }
     }
@@ -287,7 +288,7 @@ export class GitUploader {
                         fileToDelete = response.data;
                     }
                 } catch (error) {
-                    new Notice(`원격 저장소에 파일이 없습니다: ${filePath}`);
+                    new Notice(this.text.git.fileNotExist(filePath));
                     continue;
                 }
 
@@ -304,11 +305,11 @@ export class GitUploader {
                 }
             }
         } catch (error) {
-            console.error('게시물 삭제 실패:', error);
+            console.error(this.text.git.errors.deletePostFailed, error);
             throw error;
         }
 
-        new Notice(`Git 저장소에서 ${deletedCount}개의 게시물이 삭제되었습니다.`);
+        new Notice(this.text.git.deleteSuccess(deletedCount));
     }
 
     // 기존 deletePost 메서드를 deletePosts를 사용하도록 수정

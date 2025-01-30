@@ -1,10 +1,11 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import MyPlugin from './main';
+import { getText } from './ReferenceText';
 
 export interface Settings {
+	language: 'en' | 'ko' | 'zh' | 'ja' | 'es' | 'de' | 'ru';  // 'ru' 추가
 	blogPostPath: string;      // 옵시디언 내 블로그 포스트 폴더 경로
 	exportPath: string;         // 전처리된 .md 파일을 내보낼 폴더 경로
-	// workInterval: number;      // 작업 처리 주기 (밀리초 단위)
 	openAIKey: string;        // OpenAI API Key
 	blogUrl: string;          // 블로그 URL
 	preprocessingOptions: {
@@ -48,11 +49,11 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-	blogPostPath: 'Blog/Posts',
-	exportPath: 'C:/Users/Desktop/_posts',
-	// workInterval: 5 * 60 * 1000,   // 기본값: 5분
+	language: 'en', 
+	blogPostPath: '',
+	exportPath: '',
 	openAIKey: '',
-	blogUrl: 'https://username.github.io',
+	blogUrl: '',
 	preprocessingOptions: {
 		enableAutoTagging: true,
 		enableCallout: true,
@@ -105,13 +106,35 @@ export class SettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Plugin Settings' });
+		const text = getText(this.plugin.settings.language).settings;
 
 		new Setting(containerEl)
-			.setName('Blog Post Path')
-			.setDesc('옵시디언 내에서 블로그 포스트로 사용될 폴더의 경로를 지정합니다.')
-			.addText(text => text
-				.setPlaceholder('예: Blog Posts')
+			.setName(text.sections.required)
+			.setHeading();
+
+		new Setting(containerEl)
+			.setName(text.language.name)
+			.setDesc(text.language.desc)
+			.addDropdown(dropdown => dropdown
+				.addOption('en', 'English')
+				.addOption('ko', '한국어')
+				.addOption('zh', '中文')
+				.addOption('ja', '日本語')
+				.addOption('es', 'Español')
+				.addOption('de', 'Deutsch')
+				.addOption('ru', 'Русский')  // 러시아어 옵션 추가
+				.setValue(this.plugin.settings.language)
+				.onChange(async (value: 'en' | 'ko' | 'zh' | 'ja' | 'es' | 'de' | 'ru') => {  // 타입 수정
+					this.plugin.settings.language = value;
+					await this.plugin.saveSettings();
+					this.display();
+				}));
+
+		new Setting(containerEl)
+			.setName(text.blogPostPath.name)
+			.setDesc(text.blogPostPath.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.blogPostPath.placeholder)
 				.setValue(this.plugin.settings.blogPostPath)
 				.onChange(async (value) => {
 					this.plugin.settings.blogPostPath = value;
@@ -119,37 +142,21 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Export Path')
-			.setDesc('전처리된 .md 파일을 내보낼 폴더의 경로를 지정합니다.')
-			.addText(text => text
-				.setPlaceholder('예: Exported Posts')
+			.setName(text.exportPath.name)
+			.setDesc(text.exportPath.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.exportPath.placeholder)
 				.setValue(this.plugin.settings.exportPath)
 				.onChange(async (value) => {
 					this.plugin.settings.exportPath = value;
 					await this.plugin.saveSettings();
 				}));
 
-		// new Setting(containerEl)
-		// 	.setName('Work Interval (ms)')
-		// 	.setDesc('작업을 처리할 주기를 밀리초 단위로 지정합니다. 예: 300000 (5분)')
-		// 	.addText(text => text
-		// 		.setPlaceholder('예: 300000')
-		// 		.setValue(this.plugin.settings.workInterval.toString())
-		// 		.onChange(async (value) => {
-		// 			const parsed = parseInt(value);
-		// 			if (!isNaN(parsed) && parsed > 0) {
-		// 				this.plugin.settings.workInterval = parsed;
-		// 				await this.plugin.saveSettings();
-		// 			} else {
-		// 				new Notice('유효한 숫자를 입력해주세요.');
-		// 			}
-		// 		}));
-
 		new Setting(containerEl)
-			.setName('OpenAI API Key')
-			.setDesc('OpenAI API를 사용하기 위한 API 키를 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('sk-...')
+			.setName(text.openAIKey.name)
+			.setDesc(text.openAIKey.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.openAIKey.placeholder)
 				.setValue(this.plugin.settings.openAIKey)
 				.onChange(async (value) => {
 					this.plugin.settings.openAIKey = value;
@@ -157,21 +164,21 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('블로그 URL')
-			.setDesc('블로그 URL을 입력하세요. (끝에 / 미포함)')
-			.addText(text => text
-				.setPlaceholder('https://your-blog.com')
+			.setName(text.blogUrl.name)
+			.setDesc(text.blogUrl.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.blogUrl.placeholder)
 				.setValue(this.plugin.settings.blogUrl)
 				.onChange(async (value) => {
 					this.plugin.settings.blogUrl = value;
 					await this.plugin.saveSettings();
 				}));
 
-		containerEl.createEl('h3', { text: '전처리 옵션' });
+		new Setting(containerEl).setName(text.sections.preprocessing).setHeading();
 
 		new Setting(containerEl)
-			.setName('자동 태깅')
-			.setDesc('OpenAI를 사용한 자동 태깅 기능을 활성화/비활성화합니다.')
+			.setName(text.preprocessing.autoTagging.name)
+			.setDesc(text.preprocessing.autoTagging.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableAutoTagging)
 				.onChange(async (value) => {
@@ -180,8 +187,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('콜아웃 전처리')
-			.setDesc('콜아웃 블록의 전처리를 활성화/비활성화합니다.')
+			.setName(text.preprocessing.callout.name)
+			.setDesc(text.preprocessing.callout.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableCallout)
 				.onChange(async (value) => {
@@ -190,10 +197,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('콜아웃 타이틀 구분자')
-			.setDesc('콜아웃 블록의 타이틀을 구분하는 문자열을 지정합니다.')
-			.addText(text => text
-				.setPlaceholder('{title}')
+			.setName(text.preprocessing.calloutTitleSeparator.name)
+			.setDesc(text.preprocessing.calloutTitleSeparator.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.preprocessing.calloutTitleSeparator.placeholder)
 				.setValue(this.plugin.settings.preprocessingOptions.calloutTitleSeparator)
 				.onChange(async (value) => {
 					this.plugin.settings.preprocessingOptions.calloutTitleSeparator = value;
@@ -201,8 +208,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('콜아웃 자동 제목')
-			.setDesc('콜아웃의 제목이 비어있을 때 type을 제목으로 사용합니다.')
+			.setName(text.preprocessing.calloutAutoTitle.name)
+			.setDesc(text.preprocessing.calloutAutoTitle.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableCalloutAutoTitle)
 				.onChange(async (value) => {
@@ -211,8 +218,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('하이라이트 전처리')
-			.setDesc('하이라이트 텍스트의 전처리를 활성화/비활성화합니다.')
+			.setName(text.preprocessing.highlight.name)
+			.setDesc(text.preprocessing.highlight.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableHighlight)
 				.onChange(async (value) => {
@@ -221,10 +228,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('하이라이트 구분자')
-			.setDesc('하이라이트 텍스트를 감싸는 문자열을 지정합니다.')
-			.addText(text => text
-				.setPlaceholder('**')
+			.setName(text.preprocessing.highlightSeparator.name)
+			.setDesc(text.preprocessing.highlightSeparator.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.preprocessing.highlightSeparator.placeholder)
 				.setValue(this.plugin.settings.preprocessingOptions.highlightSeparator)
 				.onChange(async (value) => {
 					this.plugin.settings.preprocessingOptions.highlightSeparator = value;
@@ -232,8 +239,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('문서 링크 전처리')
-			.setDesc('문서 링크의 전처리를 활성화/비활성화합니다.')
+			.setName(text.preprocessing.docLink.name)
+			.setDesc(text.preprocessing.docLink.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableDocLink)
 				.onChange(async (value) => {
@@ -242,8 +249,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('문서 참조 전처리')
-			.setDesc('문서 참조의 전처리를 활성화/비활성화합니다.')
+			.setName(text.preprocessing.docRef.name)
+			.setDesc(text.preprocessing.docRef.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableDocRef)
 				.onChange(async (value) => {
@@ -252,8 +259,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('이미지 전처리')
-			.setDesc('이미지의 전처리를 활성화/비활성화합니다.')
+			.setName(text.preprocessing.image.name)
+			.setDesc(text.preprocessing.image.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableImage)
 				.onChange(async (value) => {
@@ -262,12 +269,12 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('이미지 위치')
-			.setDesc('이미지의 기본 정렬 위치를 설정합니다.')
+			.setName(text.preprocessing.imagePosition.name)
+			.setDesc(text.preprocessing.imagePosition.desc)
 			.addDropdown(dropdown => dropdown
-				.addOption('normal', '기본')
-				.addOption('left', '왼쪽')
-				.addOption('right', '오른쪽')
+				.addOption('normal', 'Default')
+				.addOption('left', 'Left')
+				.addOption('right', 'Right')
 				.setValue(this.plugin.settings.preprocessingOptions.imagePosition)
 				.onChange(async (value: 'normal' | 'left' | 'right') => {
 					this.plugin.settings.preprocessingOptions.imagePosition = value;
@@ -275,8 +282,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('이미지 그림자')
-			.setDesc('이미지에 그림자 효과를 적용합니다.')
+			.setName(text.preprocessing.imageShadow.name)
+			.setDesc(text.preprocessing.imageShadow.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.imageShadow)
 				.onChange(async (value) => {
@@ -285,8 +292,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('이중 중괄호 Raw 태그 변환')
-			.setDesc('수식 내 이중 중괄호를 {% raw %} 태그로 변환합니다.')
+			.setName(text.preprocessing.rawTag.name)
+			.setDesc(text.preprocessing.rawTag.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableRawTag)
 				.onChange(async (value) => {
@@ -295,8 +302,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('수식 표기법 전처리')
-			.setDesc('수식에서 위/아래 첨자의 순서를 LaTeX 표준 형식으로 변환합니다. 예: $\sum^n_{i=1}a_i$ -> $\sum_{i=1}^na_i$')
+			.setName(text.preprocessing.mathNotation.name)
+			.setDesc(text.preprocessing.mathNotation.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableMathNotation)
 				.onChange(async (value) => {
@@ -305,8 +312,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('수식 줄바꿈 처리')
-			.setDesc('디스플레이 수식($$...$$)의 앞뒤에 줄바꿈을 추가합니다.')
+			.setName(text.preprocessing.mathLineBreak.name)
+			.setDesc(text.preprocessing.mathLineBreak.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableMathLineBreak)
 				.onChange(async (value) => {
@@ -315,8 +322,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('수식 내 파이프라인 변환')
-			.setDesc('수식 내의 파이프(|)를 \\mid로 변환합니다.')
+			.setName(text.preprocessing.mathPipe.name)
+			.setDesc(text.preprocessing.mathPipe.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableMathPipe)
 				.onChange(async (value) => {
@@ -325,8 +332,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('매트릭스 줄바꿈 공백 추가')
-			.setDesc('matrix 환경에서 줄바꿈(\\\\) 양 옆에 공백을 추가합니다.')
+			.setName(text.preprocessing.matrixLineBreak.name)
+			.setDesc(text.preprocessing.matrixLineBreak.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableMatrixLineBreak)
 				.onChange(async (value) => {
@@ -335,8 +342,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('인라인 수식을 디스플레이 수식으로 변환')
-			.setDesc('단일 달러($)로 둘러싸인 인라인 수식을 이중 달러($$)로 변환합니다.')
+			.setName(text.preprocessing.inlineToDisplay.name)
+			.setDesc(text.preprocessing.inlineToDisplay.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableInlineToDisplay)
 				.onChange(async (value) => {
@@ -345,8 +352,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('리스트 수식 이스케이프')
-			.setDesc('리스트 항목(-나 *) 뒤의 수식 앞에 이스케이프(\\)를 추가합니다.')
+			.setName(text.preprocessing.listMathEscape.name)
+			.setDesc(text.preprocessing.listMathEscape.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableListMathEscape)
 				.onChange(async (value) => {
@@ -355,8 +362,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('코드 블록 언어 소문자 변환')
-			.setDesc('코드 블록의 언어를 소문자로 변환합니다. 예: ```C# > ```c#')
+			.setName(text.preprocessing.lowercaseCodeLang.name)
+			.setDesc(text.preprocessing.lowercaseCodeLang.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableLowercaseCodeLang)
 				.onChange(async (value) => {
@@ -365,8 +372,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('콜아웃 내 코드 블록 이스케이프 처리')
-			.setDesc('콜아웃 내 코드 블록의 이스케이프된 꺾쇠 괄호(\\<, \\>)를 일반 꺾쇠 괄호(<, >)로 변환합니다.')
+			.setName(text.preprocessing.calloutCodeBlockEscape.name)
+			.setDesc(text.preprocessing.calloutCodeBlockEscape.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableCalloutCodeBlockEscape)
 				.onChange(async (value) => {
@@ -375,8 +382,8 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('코드블록 내 탭을 공백으로 변환')
-			.setDesc('코드블록 내의 탭 문자를 공백으로 변환합니다.')
+			.setName(text.preprocessing.tabToSpaces.name)
+			.setDesc(text.preprocessing.tabToSpaces.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableTabToSpaces)
 				.onChange(async (value) => {
@@ -385,10 +392,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('탭 크기')
-			.setDesc('탭 문자를 몇 개의 공백으로 변환할지 설정합니다.')
-			.addText(text => text
-				.setPlaceholder('4')
+			.setName(text.preprocessing.tabSize.name)
+			.setDesc(text.preprocessing.tabSize.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.preprocessing.tabSize.placeholder)
 				.setValue(String(this.plugin.settings.preprocessingOptions.tabSize ?? 4))
 				.onChange(async (value) => {
 					const parsed = parseInt(value);
@@ -396,13 +403,13 @@ export class SettingTab extends PluginSettingTab {
 						this.plugin.settings.preprocessingOptions.tabSize = parsed;
 						await this.plugin.saveSettings();
 					} else {
-						new Notice('유효한 숫자를 입력해주세요.');
+						new Notice(text.preprocessing.tabSize.notice);
 					}
 				}));
 
 		new Setting(containerEl)
-			.setName('URL 자동 하이퍼링크')
-			.setDesc('단독으로 있는 URL을 자동으로 하이퍼링크로 변환합니다. (예: https://... -> <https://...>)')
+			.setName(text.preprocessing.autoHyperlink.name)
+			.setDesc(text.preprocessing.autoHyperlink.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.preprocessingOptions.enableAutoHyperlink)
 				.onChange(async (value) => {
@@ -410,11 +417,11 @@ export class SettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		containerEl.createEl('h3', { text: 'Git 설정' });
+		new Setting(containerEl).setName(text.sections.git).setHeading();
 
 		new Setting(containerEl)
-			.setName('Git 업로드 활성화')
-			.setDesc('GitHub에 자동으로 파일을 업로드합니다.')
+			.setName(text.git.enable.name)
+			.setDesc(text.git.enable.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.gitConfig.enabled)
 				.onChange(async (value) => {
@@ -423,10 +430,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('저장소 소유자')
-			.setDesc('GitHub 저장소 소유자의 사용자명을 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('username')
+			.setName(text.git.owner.name)
+			.setDesc(text.git.owner.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.owner.placeholder)
 				.setValue(this.plugin.settings.gitConfig.owner)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.owner = value;
@@ -434,10 +441,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('저장소 이름')
-			.setDesc('GitHub 저장소 이름을 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('repository-name')
+			.setName(text.git.repo.name)
+			.setDesc(text.git.repo.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.repo.placeholder)
 				.setValue(this.plugin.settings.gitConfig.repo)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.repo = value;
@@ -445,10 +452,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('브랜치')
-			.setDesc('업로드할 브랜치 이름을 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('main')
+			.setName(text.git.branch.name)
+			.setDesc(text.git.branch.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.branch.placeholder)
 				.setValue(this.plugin.settings.gitConfig.branch)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.branch = value;
@@ -456,10 +463,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('GitHub 토큰')
-			.setDesc('GitHub Personal Access Token을 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('ghp_...')
+			.setName(text.git.token.name)
+			.setDesc(text.git.token.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.token.placeholder)
 				.setValue(this.plugin.settings.gitConfig.token)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.token = value;
@@ -467,10 +474,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('포스트 업로드 경로')
-			.setDesc('블로그 포스트가 업로드될 Git Repository 내 경로를 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('_posts')
+			.setName(text.git.uploadPostPath.name)
+			.setDesc(text.git.uploadPostPath.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.uploadPostPath.placeholder)
 				.setValue(this.plugin.settings.gitConfig.uploadPostPath)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.uploadPostPath = value;
@@ -478,10 +485,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('이미지 업로드 경로')
-			.setDesc('이미지 파일이 업로드될 Git Repository 내 경로를 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('assets/img/posts')
+			.setName(text.git.uploadImagePath.name)
+			.setDesc(text.git.uploadImagePath.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.uploadImagePath.placeholder)
 				.setValue(this.plugin.settings.gitConfig.uploadImagePath)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.uploadImagePath = value;
@@ -489,10 +496,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('커밋 메시지 템플릿')
-			.setDesc('파일 업로드 시 사용할 커밋 메시지 템플릿. {count}는 업로드된 파일 개수를 의미합니다.')
-			.addText(text => text
-				.setPlaceholder('Update: {filename}')
+			.setName(text.git.commitMessageTemplate.name)
+			.setDesc(text.git.commitMessageTemplate.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.commitMessageTemplate.placeholder)
 				.setValue(this.plugin.settings.gitConfig.commitMessageTemplate)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.commitMessageTemplate = value;
@@ -500,19 +507,19 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('이미지 경로')
-			.setDesc('옵시디언 내의 이미지 파일이 저장된 경로를 입력하세요.')
-			.addText(text => text
-				.setPlaceholder('assets/img')
+			.setName(text.git.imagePath.name)
+			.setDesc(text.git.imagePath.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.imagePath.placeholder)
 				.setValue(this.plugin.settings.gitConfig.imagePath)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.imagePath = value;
-						await this.plugin.saveSettings();
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)
-			.setName('삭제 확인')
-			.setDesc('게시물 삭제 전 확인 대화상자를 표시합니다.')
+			.setName(text.git.deleteConfirmation.name)
+			.setDesc(text.git.deleteConfirmation.desc)
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.gitConfig.deleteConfirmation)
 				.onChange(async (value) => {
@@ -521,10 +528,10 @@ export class SettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('삭제 커밋 메시지')
-			.setDesc('게시물 삭제 시 사용할 커밋 메시지 템플릿. {filename}은 삭제된 파일명으로 대체됩니다.')
-			.addText(text => text
-				.setPlaceholder('docs: delete post - {filename}')
+			.setName(text.git.deleteCommitTemplate.name)
+			.setDesc(text.git.deleteCommitTemplate.desc)
+			.addText(textComponent => textComponent
+				.setPlaceholder(text.git.deleteCommitTemplate.placeholder)
 				.setValue(this.plugin.settings.gitConfig.deleteCommitTemplate)
 				.onChange(async (value) => {
 					this.plugin.settings.gitConfig.deleteCommitTemplate = value;
