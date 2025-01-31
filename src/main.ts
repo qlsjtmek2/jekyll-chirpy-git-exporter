@@ -135,20 +135,6 @@ export default class Main extends Plugin {
 				}
 			})
 		);
-
-		// 커맨드 등록 수정
-		this.addCommand({
-			id: this.getText().commands.exportPost.id,
-			name: this.getText().commands.exportPost.name,
-			callback: () => {
-				const file = this.app.workspace.getActiveFile();
-				if (file instanceof TFile) {
-					this.requestExportPost([file]);
-				} else {
-					new Notice(this.getText().notice.noActiveFile);
-				}
-			}
-		});
 	}
 
 	onunload() {
